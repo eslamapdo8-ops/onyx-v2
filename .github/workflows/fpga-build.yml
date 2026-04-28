@@ -16,8 +16,11 @@ jobs:
     
     - name: Install OSS CAD Suite (Yosys + nextpnr + IceStorm)
       run: |
-        wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2024-12-09/oss-cad-suite-linux-x64-2024-12-09.tgz
-        tar -xzf oss-cad-suite-linux-x64-2024-12-09.tgz
+        # Get latest release from GitHub API
+        LATEST=$(curl -s https://api.github.com/repos/YosysHQ/oss-cad-suite-build/releases/latest | grep "browser_download_url.*linux-x64" | cut -d'"' -f4 | head -1)
+        echo "Downloading: $LATEST"
+        wget -q "$LATEST"
+        tar -xzf oss-cad-suite-linux-x64-*.tgz
         echo "$PWD/oss-cad-suite/bin" >> $GITHUB_PATH
     
     - name: Run Yosys synthesis
@@ -34,9 +37,8 @@ jobs:
     
     - name: Run Icarus Verilog simulation
       run: |
-        # Install Icarus
         sudo apt-get update -qq && sudo apt-get install -y -qq iverilog
-        iverilog -o build/sim_v2 rtl/tb_onyx_core.v rtl/nco_oscillator.v rtl/lfsr.v rtl/voting_unit.v rtl/onyx_core.v 2>&1 | tee build/iverilog.log
+        iverilog -g2012 -o build/sim_v2 tb/tb_onyx_core_v2.v rtl/nco_oscillator.v rtl/voting_unit.v rtl/onyx_core.v 2>&1 | tee build/iverilog.log
         cd build && vvp sim_v2 2>&1 | tee simulation.txt
     
     - name: Upload build artifacts
