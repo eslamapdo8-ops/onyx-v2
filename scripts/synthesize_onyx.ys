@@ -1,0 +1,21 @@
+# Onyx V2 — Yosys Synthesis Script
+# الهدف: iCE40UP5K (UltraPlus)
+# ---------------------------------
+
+# قراءة ملفات التصميم
+read -sv rtl/nco_oscillator.v
+read -sv rtl/lfsr.v
+read -sv rtl/voting_unit.v
+read -sv rtl/onyx_core.v
+
+# توليف
+synth_ice40 -top onyx_core -json build/onyx_core.json
+
+# تقرير الموارد
+tee -o build/resource_report.txt stat
+
+# تحليل التوقيت
+tee -o build/timing_report.txt abc -clk 100
+
+# عرض الهيكل
+show -prefix build/onyx_core_schematic

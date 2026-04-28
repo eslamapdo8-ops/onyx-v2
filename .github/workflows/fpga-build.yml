@@ -1,0 +1,60 @@
+name: Onyx V2 FPGA Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Install OSS CAD Suite (Yosys + nextpnr + IceStorm)
+      run: |
+        wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2024-12-09/oss-cad-suite-linux-x64-2024-12-09.tgz
+        tar -xzf oss-cad-suite-linux-x64-2024-12-09.tgz
+        echo "$PWD/oss-cad-suite/bin" >> $GITHUB_PATH
+    
+    - name: Run Yosys synthesis
+      run: |
+        mkdir -p build
+        yosys -v 3 -l build/yosys.log scripts/synthesize_onyx.ys 2>&1 | tee build/synthesis_output.txt
+    
+    - name: Resource report
+      run: |
+        echo "## Resource Report" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        grep -E "(number of cells|Number of|LUT|FF|SB_IO|SB_GB)" build/yosys.log | head -30 >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+    
+    - name: Run Icarus Verilog simulation
+      run: |
+        # Install Icarus
+        sudo apt-get update -qq && sudo apt-get install -y -qq iverilog
+        iverilog -o build/sim_v2 rtl/tb_onyx_core.v rtl/nco_oscillator.v rtl/lfsr.v rtl/voting_unit.v rtl/onyx_core.v 2>&1 | tee build/iverilog.log
+        cd build && vvp sim_v2 2>&1 | tee simulation.txt
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: onyx-v2-build
+        path: build/
+    
+    - name: Summary
+      run: |
+        echo "## Onyx V2 FPGA Build" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Synthesis Log" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        tail -30 build/yosys.log >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Simulation Results" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat build/simulation.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
