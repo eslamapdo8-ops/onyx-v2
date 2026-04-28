@@ -45,35 +45,26 @@ module onyx_core #(
     wire [N_OSC-1:0]             osc_firing_dir;
     wire [N_OSC*ACC_WIDTH-1:0]   osc_fire_counts;
 
-    // LFSR noise
-    wire signed [31:0] noise;
-    wire lfsr_enable = (state == RUN);
-
-    lfsr #(.WIDTH(32)) noise_gen (
-        .clk(clk),
-        .rst_n(rst_n),
-        .enable(lfsr_enable),
-        .noise(noise)
-    );
-
-    // توليد المذبذبات
+    // توليد المذبذبات (كل واحد مع LFSR مدمج و seed مستقل)
     genvar i;
     generate
         for (i = 0; i < N_OSC; i = i + 1) begin : osc_bank
             // عتبات مختلفة لكل مذبذب (0.8×TH إلى 1.2×TH)
             localparam [31:0] OSC_TH = THRESHOLD +
                 (THRESHOLD * ((i * 40) / (N_OSC * 100))) - (THRESHOLD / 5);
+            // Seeds مختلفة لكل مذبذب
+            localparam [31:0] OSC_SEED = 32'hACE1_42BD + (i * 32'h1000_0000);
 
             nco_oscillator #(
                 .ACC_WIDTH(ACC_WIDTH),
                 .THRESHOLD(OSC_TH),
-                .OFFSET(OFFSET)
+                .OFFSET(OFFSET),
+                .LFSR_SEED(OSC_SEED)
             ) osc (
                 .clk(clk),
                 .rst_n(rst_n),
                 .enable((state == RUN)),
                 .f_word(signal_value),
-                .noise(noise),
                 .fire_pos(osc_fire_pos[i]),
                 .fire_neg(osc_fire_neg[i]),
                 .fire_count(osc_fire_counts[i*ACC_WIDTH +: ACC_WIDTH]),

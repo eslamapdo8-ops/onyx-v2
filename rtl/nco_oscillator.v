@@ -1,45 +1,54 @@
 /*
- * Onyx V2 — NCO Oscillator
- * ==========================
- * 32-bit signed Numerically Controlled Oscillator
- * مع مقارنات عتبة موجبة/سالبة + Firing Direction Encoding
- *
- * المعاملات:
- *   ACC_WIDTH: 32 (عرض الـ accumulator)
- *   THRESHOLD: 32'h40000000 (2^30)
- *   OFFSET:    32'h20000000 (2^29 = TH/2)
+ * Onyx V2 — NCO Oscillator مع LFSR مدمج
+ * ========================================
+ * كل مذبذب له LFSR الخاص به (seed مختلف).
+ * 32-bit signed NCO + مقارنات عتبة + FDE
  */
 
 module nco_oscillator #(
     parameter ACC_WIDTH = 32,
     parameter THRESHOLD = 32'h40000000,
-    parameter OFFSET    = 32'h20000000
+    parameter OFFSET    = 32'h20000000,
+    parameter LFSR_SEED = 32'hACE1_42BD
 )(
     input  wire                 clk,
     input  wire                 rst_n,
     input  wire                 enable,
-    input  wire signed [ACC_WIDTH-1:0] f_word,    // كلمة التردد + الإشارة
-    input  wire signed [ACC_WIDTH-1:0] noise,     // ضوضاء رقمية (من LFSR)
-    output reg                  fire_pos,          // إطلاق موجب
-    output reg                  fire_neg,          // إطلاق سالب
-    output reg  [ACC_WIDTH-1:0] fire_count,        // عدد الإطلاقات (عرض كامل)
-    output reg                  firing_dir         // اتجاه آخر إطلاق (1=موجب, 0=سالب)
+    input  wire signed [ACC_WIDTH-1:0] f_word,
+    output reg                  fire_pos,
+    output reg                  fire_neg,
+    output reg  [ACC_WIDTH-1:0] fire_count,
+    output reg                  firing_dir
 );
 
     reg signed [ACC_WIDTH-1:0] acc;
+    reg [ACC_WIDTH-1:0]        lfsr_state;
+
+    // LFSR polynomial: x^32 + x^22 + x^2 + x^1 + 1
+    wire feedback = lfsr_state[0];
+    wire [ACC_WIDTH-1:0] next_lfsr = {lfsr_state[ACC_WIDTH-2:0], 1'b0};
+    wire signed [ACC_WIDTH-1:0] noise =
+        {lfsr_state[7:0], lfsr_state[15:8], lfsr_state[23:16], lfsr_state[31:24]} / 2;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            acc       <= 0;
-            fire_pos  <= 0;
-            fire_neg  <= 0;
+            acc        <= 0;
+            fire_pos   <= 0;
+            fire_neg   <= 0;
             fire_count <= 0;
             firing_dir <= 0;
+            lfsr_state <= LFSR_SEED;
         end else if (enable) begin
-            // تجميع: acc += f_word + noise
+            // LFSR step
+            if (feedback)
+                lfsr_state <= next_lfsr ^ 32'hB4BCD35C;
+            else
+                lfsr_state <= next_lfsr;
+
+            // NCO accumulate: acc += f_word + noise
             acc <= acc + f_word + noise;
-            
-            // مقارنة العتبات
+
+            // Threshold comparison
             if (acc > $signed(THRESHOLD)) begin
                 fire_pos   <= 1;
                 fire_neg   <= 0;

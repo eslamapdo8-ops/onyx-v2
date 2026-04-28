@@ -4,7 +4,6 @@
 
 # قراءة ملفات التصميم
 read -sv rtl/nco_oscillator.v
-read -sv rtl/lfsr.v
 read -sv rtl/voting_unit.v
 read -sv rtl/onyx_core.v
 
