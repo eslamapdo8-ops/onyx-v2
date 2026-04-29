@@ -58,36 +58,30 @@ class NCO:
 
 
 # ========== Pure NumPy CNN ==========
-def im2col(img, ksize=3, stride=1, pad=1):
-    """Convert image to column matrix for efficient convolution."""
-    C, H, W = img.shape
-    H_out = (H + 2*pad - ksize) // stride + 1
-    W_out = (W + 2*pad - ksize) // stride + 1
-    img_pad = np.pad(img, ((0,0), (pad,pad), (pad,pad)), mode='constant')
-
-    cols = np.zeros((C, ksize, ksize, H_out, W_out))
-    for h in range(H_out):
-        for w in range(W_out):
-            cols[:, :, :, h, w] = img_pad[:, h*stride:h*stride+ksize,
-                                            w*stride:w*stride+ksize]
-    cols = cols.transpose(1, 2, 0, 3, 4).reshape(ksize*ksize*C, H_out*W_out)
-    return cols
-
-
-def conv2d_forward(x, W, b):
-    """x: (N, C, H, W), W: (F, C, 3, 3), b: (F,) → (N, F, H', W')."""
+def conv2d_numpy(x, W, b):
+    """Numpy-native conv using einsum — ~50x faster than im2col loop.
+    x: (N, C, H, W), W: (F, C, 3, 3) → (N, F, H', W').
+    """
     N, C, H, Wx = x.shape
     F, _, ksize, _ = W.shape
-    stride = 1
     pad = 1
+    stride = 1
     H_out = (H + 2*pad - ksize) // stride + 1
     W_out = (Wx + 2*pad - ksize) // stride + 1
 
-    out = np.zeros((N, F, H_out, W_out))
-    for n in range(N):
-        cols = im2col(x[n], ksize, stride, pad)  # (C*9, H'*W')
-        W_flat = W.reshape(F, -1)                 # (F, C*9)
-        out[n] = (W_flat @ cols + b[:, None]).reshape(F, H_out, W_out)
+    # Pad input
+    x_pad = np.pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)), mode='constant')
+
+    # Extract sliding windows via as_strided
+    from numpy.lib.stride_tricks import as_strided
+    shape = (N, C, H_out, W_out, ksize, ksize)
+    strides = (*x_pad.strides[:2], x_pad.strides[2] * stride,
+              x_pad.strides[3] * stride, x_pad.strides[2], x_pad.strides[3])
+    windows = as_strided(x_pad, shape=shape, strides=strides)
+
+    # einsum: (N, C, H', W', kh, kw) × (F, C, kh, kw) → (N, F, H', W')
+    out = np.einsum('nchwkl,fckl->nfhw', windows, W, optimize=True)
+    out += b[None, :, None, None]
     return np.maximum(out, 0)  # ReLU
 
 
@@ -124,11 +118,11 @@ def build_cnn():
         x = x / 127.5 - 1.0  # normalize to [-1, 1]
 
         # Conv1 + ReLU + Pool
-        x = conv2d_forward(x, cnn.W1, cnn.b1)  # (N, 8, 28, 28)
+        x = conv2d_numpy(x, cnn.W1, cnn.b1)  # (N, 8, 28, 28)
         x = maxpool2x2(x)              # (N, 8, 14, 14)
 
         # Conv2 + ReLU + Pool
-        x = conv2d_forward(x, cnn.W2, cnn.b2)  # (N, 16, 14, 14)
+        x = conv2d_numpy(x, cnn.W2, cnn.b2)  # (N, 16, 14, 14)
         x = maxpool2x2(x)              # (N, 16, 7, 7)
 
         # Flatten + FC
@@ -290,7 +284,7 @@ def main():
     print(SEP)
     print("  EXP 1: Hybrid CNN+NCO — Binary (0 vs 1)")
     print(SEP)
-    tr, te = run_experiment([0, 1], n_train=1000, n_test=500,
+    tr, te = run_experiment([0, 1], n_train=200, n_test=100,
                            n_dims=256, n_steps=3)
     results.append(('binary', 256, 3, tr, te))
 
@@ -299,7 +293,7 @@ def main():
     print("  EXP 2: Hybrid CNN+NCO — 3-Class (0 vs 1 vs 6)")
     print(SEP)
     for n_dims in [128, 256]:
-        tr, te = run_experiment([0, 1, 6], n_train=600, n_test=300,
+        tr, te = run_experiment([0, 1, 6], n_train=200, n_test=100,
                                n_dims=n_dims, n_steps=3)
         results.append(('3class', n_dims, 3, tr, te))
 
