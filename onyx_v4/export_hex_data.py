@@ -102,10 +102,17 @@ clf.fit(fingerprints, y)
 W = clf.coef_
 
 # ── Write weights.hex ──
+# RidgeClassifier in binary mode returns coef_ of shape (n_features,)
+# We build 2x16: class 0 = +coef, class 1 = -coef (mirror)
+if W.ndim == 1:
+    W_2d = np.stack([+W, -W], axis=0)  # (2, 16)
+else:
+    W_2d = W  # already (n_classes, n_features)
+
 with open('weights_hex.txt', 'w') as f:
     for c in range(2):
         for d in range(16):
-            val = int(W[c, d])
+            val = int(W_2d[c, d])
             if val < 0:
                 val = val & 0xFFFF
             f.write(f'{val:04X} ')
