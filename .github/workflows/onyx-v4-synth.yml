@@ -17,10 +17,8 @@ jobs:
 
       - name: Install OSS CAD Suite
         run: |
-          # Try latest release, fallback to known working version
-          URL="https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-02-14/oss-cad-suite-linux-x64.tgz"
-          wget -q "$URL" || \
-            wget -q "https://github.com/YosysHQ/oss-cad-suite-build/releases/latest/download/oss-cad-suite-linux-x64.tgz"
+          TAG=$(curl -sL "https://api.github.com/repos/YosysHQ/oss-cad-suite-build/releases/latest" | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
+          wget -q "https://github.com/YosysHQ/oss-cad-suite-build/releases/download/$TAG/oss-cad-suite-linux-x64.tgz"
           tar -xzf oss-cad-suite-linux-x64.tgz
           echo "$PWD/oss-cad-suite/bin" >> $GITHUB_PATH
 
