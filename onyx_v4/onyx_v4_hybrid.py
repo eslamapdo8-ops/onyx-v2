@@ -115,22 +115,22 @@ def build_cnn():
     W3 = np.random.randn(128, 784) * np.sqrt(2.0 / 784)
     b3 = np.zeros(128)
 
-    def forward(images_np):
+    def forward(images_np, _W1=W1, _b1=b1, _W2=W2, _b2=b2, _W3=W3, _b3=b3):
         """images_np: (N, 28, 28) → features: (N, 128)."""
         x = images_np[:, None, :, :].astype(np.float32)  # (N, 1, 28, 28)
         x = x / 127.5 - 1.0  # normalize to [-1, 1]
 
         # Conv1 + ReLU + Pool
-        x = conv2d_forward(x, W1, b1)  # (N, 8, 28, 28)
+        x = conv2d_forward(x, _W1, _b1)  # (N, 8, 28, 28)
         x = maxpool2x2(x)              # (N, 8, 14, 14)
 
         # Conv2 + ReLU + Pool
-        x = conv2d_forward(x, W2, b2)  # (N, 16, 14, 14)
+        x = conv2d_forward(x, _W2, _b2)  # (N, 16, 14, 14)
         x = maxpool2x2(x)              # (N, 16, 7, 7)
 
         # Flatten + FC
         x = flatten(x)                 # (N, 784)
-        x = x @ W3.T + b3              # (N, 128) — no activation
+        x = x @ _W3.T + _b3            # (N, 128) — no activation
         return x
 
     return forward
