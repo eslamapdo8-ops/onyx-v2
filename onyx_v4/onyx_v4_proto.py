@@ -147,10 +147,13 @@ def train_linear_readout(fingerprints, labels, class_ids):
     for i, lbl in enumerate(labels):
         Y[i, label_to_idx[lbl]] = 1.0
 
-    # Ridge regression (L2 regularized): W = Y @ F.T @ (F @ F.T + λI)^-1
-    lam = 0.1
-    F = fingerprints.astype(np.float32)
-    W = Y @ F.T @ np.linalg.inv(F @ F.T + lam * np.eye(n_samples))
+    # Ridge regression: W = (F^T F + λI)^{-1} F^T Y
+    # Works when n_dims > n_samples or n_dims < n_samples
+    lam = 1.0  # strong regularization for small sample size
+    F = fingerprints.astype(np.float64)
+    n_dims = F.shape[1]
+    W = np.linalg.inv(F.T @ F + lam * np.eye(n_dims)) @ F.T @ Y
+    W = W.T  # now W: (n_classes, n_dims)
 
     def predict(fp_new):
         """fp_new: (N_DIMS,) fingerprint vector."""
@@ -277,25 +280,25 @@ def main():
     print(SEP)
     print("  EXP 1: Hamming — Binary (0 vs 1)")
     print(SEP)
-    for n_dims in [128, 256, 512]:
-        for n_steps in [2, 3, 5]:
+    for n_dims in [256]:  # N=256 proved 100% in earlier test
+        for n_steps in [3]:
             tr, te = run_experiment([0, 1], n_train=200, n_test=200,
                                    n_dims=n_dims, n_steps=n_steps,
                                    classifier='hamming')
             results.append(('binary', n_dims, n_steps, 'hamming', tr, te))
 
     # ==========================================
-    # Experiment 2: Hamming, 3-Class (0 vs 1 vs 6)
+    # Experiment 2: Hamming + Linear, 3-Class
     # ==========================================
     print(f"\n{SEP}")
-    print("  EXP 2: Hamming — 3-Class (0 vs 1 vs 6)")
+    print("  EXP 2: 3-Class (0 vs 1 vs 6) — Hamming vs Linear")
     print(SEP)
-    for n_dims in [128, 256]:
-        for n_steps in [2, 3, 5]:
-            tr, te = run_experiment([0, 1, 6], n_train=100, n_test=100,
-                                   n_dims=n_dims, n_steps=n_steps,
-                                   classifier='hamming')
-            results.append(('3class', n_dims, n_steps, 'hamming', tr, te))
+    for method in ['hamming', 'linear']:
+        for n_dims in [256, 512]:
+            tr, te = run_experiment([0, 1, 6], n_train=300, n_test=200,
+                                   n_dims=n_dims, n_steps=3,
+                                   classifier=method)
+            results.append(('3class', n_dims, 3, method, tr, te))
 
     # ==========================================
     # Experiment 3: Linear Readout, 10-Class
@@ -303,11 +306,12 @@ def main():
     print(f"\n{SEP}")
     print("  EXP 3: Linear Readout — 10-Class MNIST")
     print(SEP)
-    # Small-scale: N=128, limited training data for demonstration
-    tr, te = run_experiment(list(range(10)), n_train=40, n_test=40,
-                           n_dims=128, n_steps=3,
-                           classifier='linear')
-    results.append(('10class', 128, 3, 'linear', tr, te))
+    for n_dims in [256, 512]:
+        tr, te = run_experiment(list(range(10)),
+                               n_train=200, n_test=200,
+                               n_dims=n_dims, n_steps=3,
+                               classifier='linear')
+        results.append(('10class', n_dims, 3, 'linear', tr, te))
 
     # ==========================================
     # Experiment 4: Linear Readout, Binary — full data
