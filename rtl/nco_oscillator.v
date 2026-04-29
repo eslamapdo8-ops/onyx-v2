@@ -39,10 +39,12 @@ module nco_oscillator #(
             fire_count <= 0;
             firing_dir <= 0;
             lfsr_state <= LFSR_SEED;
-        end else if (reset_counts) begin
-            // إعادة تعيين fire_count فقط (يُحافظ على acc, lfsr, phase)
-            fire_count <= 0;
         end else if (enable) begin
+            // reset_counts + enable في نفس الدورة: fire_count يُصفّر أولاً
+            // ثم يعمل NCO كالمعتاد
+            if (reset_counts)
+                fire_count <= 0;
+
             // LFSR step
             if (feedback)
                 lfsr_state <= next_lfsr ^ 32'hB4BCD35C;
