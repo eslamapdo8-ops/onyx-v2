@@ -1,9 +1,14 @@
 import numpy as np
 from sklearn.linear_model import RidgeClassifier, LogisticRegression
 
-# Read features from hex
-raw = np.loadtxt('/workspaces/onyx-v2/onyx_v4/features_hex.txt', converters={0: lambda s: int(s, 16)})
-features = raw.reshape(50, 16).astype(np.int64)
+# Read features from hex (each value is 8-hex-char, parse manually)
+with open('/workspaces/onyx-v2/onyx_v4/features_hex.txt') as f:
+    lines = f.readlines()
+features = np.zeros((len(lines), 16), dtype=np.int64)
+for s, line in enumerate(lines):
+    vals = line.strip().split()
+    for d, v in enumerate(vals):
+        features[s, d] = int(v, 16)
 features_signed = np.where(features > 0x7FFFFFFF, features - 0x100000000, features)
 print('Features range:', features_signed.min(), features_signed.max())
 
