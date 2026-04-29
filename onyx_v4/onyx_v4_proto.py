@@ -107,8 +107,8 @@ def encode_nco_array(images, proj_matrix, ncos, n_steps=3):
         # Random projection
         proj = proj_matrix @ centered  # (N_DIMS,)
 
-        # Scale to reasonable drive range (±TH)
-        scale = TH * 0.15 / max(np.abs(proj).max(), 1.0)
+        # Scale to reasonable drive range (±TH/4 approximately)
+        scale = TH * 0.4 / max(np.abs(proj).max(), 1.0)
 
         for d in range(n_dims):
             ncos[d].reset()
@@ -176,7 +176,7 @@ def hamming_classify(fp, templates):
 
 
 def run_experiment(class_ids, n_train=200, n_test=200, n_dims=256,
-                   n_steps=3, sparsity=0.1,
+                   n_steps=3,                   sparsity=0.5,
                    classifier='hamming', alpha=5.0):
     """
     Full MNIST experiment with NCO Array.
@@ -294,9 +294,10 @@ def main():
     print("  EXP 2: 3-Class (0 vs 1 vs 6) — Hamming vs Linear")
     print(SEP)
     for method in ['hamming', 'linear']:
-        for n_dims in [256, 512]:
+        for n_dims in [256, 512, 1024]:
             tr, te = run_experiment([0, 1, 6], n_train=300, n_test=200,
                                    n_dims=n_dims, n_steps=3,
+                                   sparsity=0.5,
                                    classifier=method)
             results.append(('3class', n_dims, 3, method, tr, te))
 
@@ -306,10 +307,11 @@ def main():
     print(f"\n{SEP}")
     print("  EXP 3: Linear Readout — 10-Class MNIST")
     print(SEP)
-    for n_dims in [256, 512]:
+    for n_dims in [256, 512, 1024]:
         tr, te = run_experiment(list(range(10)),
                                n_train=200, n_test=200,
                                n_dims=n_dims, n_steps=3,
+                               sparsity=0.5,
                                classifier='linear')
         results.append(('10class', n_dims, 3, 'linear', tr, te))
 
