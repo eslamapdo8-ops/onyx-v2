@@ -35,7 +35,8 @@ module tb_onyx_v4;
 
     onyx_v4_core #(
         .N_OSC(N_OSC),
-        .N_CLASSES(N_CLASSES)
+        .N_CLASSES(N_CLASSES),
+        .N_WINDOW(20)   // زيادة لضمان إطلاقات كافية
     ) dut (
         .clk(clk), .rst_n(rst_n),
         .start(start), .load_weights(load_weights),

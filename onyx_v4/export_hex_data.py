@@ -93,7 +93,7 @@ for s in range(len(features)):
     for d in range(16):
         ncos[d].reset()
         fw = int(features[s, d] * (2**30))
-        for _ in range(3):
+        for _ in range(20):
             ncos[d].step(fw)
         fingerprints[s, d] = 1 if ncos[d].firing_dir else -1
 
