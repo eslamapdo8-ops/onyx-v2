@@ -1,0 +1,27 @@
+# iCEBreaker Pin Constraints for Onyx V4
+# Board: iCEBreaker v1.2
+# FPGA: iCE40 UP5K (SG48 package)
+
+# Clock
+set_io clk_12mhz 35    # 12 MHz oscillator
+
+# Reset button
+set_io rst_n 3         # Button (active low)
+
+# UART (PMOD B)
+set_io uart_rx 9       # PMOD B[0] — UART receive
+set_io uart_tx 11      # PMOD B[1] — UART transmit
+
+# Debug LEDs (on-board 8 LEDs)
+set_io led[0] 44       # LED D1
+set_io led[1] 45       # LED D2
+set_io led[2] 46       # LED D3
+set_io led[3] 47       # LED D4
+set_io led[4] 48       # LED D5
+set_io led[5] 15       # LED D6
+set_io led[6] 16       # LED D7
+set_io led[7] 17       # LED D8
+
+# Status LEDs
+set_io led_green 39    # RGB LED Green
+set_io led_red 38      # RGB LED Red
