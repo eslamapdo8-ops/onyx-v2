@@ -143,14 +143,19 @@ module onyx_v4_core #(
 
                 READOUT: begin
                     // حساب scores[c] = sum_d(weight_mem[c*N + d] × fingerprint[d])
-                    // fingerprint[d] = +1 (firing_dir=1) أو -1 (firing_dir=0)
+                    // fingerprint[d] = fire_count[d] (كمي — شدة الاستجابة)
+                    // نستخدم fire_count بدلاً من firing_dir (±1) لتفاوت أفضل
                     for (c = 0; c < N_CLASSES; c = c + 1) begin
                         scores[c] = 0;
                         for (d = 0; d < N_OSC; d = d + 1) begin
                             if (osc_firing_dir[d])
-                                scores[c] = scores[c] + weight_mem[c * N_OSC + d];
+                                scores[c] = scores[c] +
+                                    weight_mem[c * N_OSC + d] *
+                                    osc_fire_counts[d * ACC_WIDTH +: ACC_WIDTH];
                             else
-                                scores[c] = scores[c] - weight_mem[c * N_OSC + d];
+                                scores[c] = scores[c] -
+                                    weight_mem[c * N_OSC + d] *
+                                    osc_fire_counts[d * ACC_WIDTH +: ACC_WIDTH];
                         end
                     end
                     state <= DONE_ST;

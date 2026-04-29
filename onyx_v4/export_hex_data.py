@@ -88,14 +88,16 @@ print('✓ features_hex.txt (50×16)')
 
 # ── NCO encode ──
 ncos = [NCO(th=0.5 * (1 + 0.3 * (i / 16))) for i in range(16)]
-fingerprints = np.zeros((len(features), 16), dtype=np.int8)
+fingerprints = np.zeros((len(features), 16), dtype=np.int32)
 for s in range(len(features)):
     for d in range(16):
         ncos[d].reset()
         fw = int(features[s, d] * (2**30))
         for _ in range(20):
             ncos[d].step(fw)
-        fingerprints[s, d] = 1 if ncos[d].firing_dir else -1
+        # fingerprint كمية: fire_count × (±1) بدلاً من ±1 فقط
+        sign = 1 if ncos[d].firing_dir else -1
+        fingerprints[s, d] = sign * ncos[d].fire_count
 
 # ── Train Linear Readout ──
 clf = RidgeClassifier(alpha=1.0)
