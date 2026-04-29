@@ -51,7 +51,7 @@ module tb_onyx_v4;
     reg signed [15:0] weight_mem_ref [0:N_CLASSES*N_OSC-1];
     reg [7:0] expected_labels [0:N_SAMPLES-1];
 
-    integer i, j, s, correct;
+    integer i, j, s, correct, ch;
     integer f_handle, w_handle, l_handle;
 
     initial begin
@@ -75,7 +75,7 @@ module tb_onyx_v4;
             $finish;
         end
         for (s = 0; s < N_SAMPLES; s = s + 1)
-            expected_labels[s] = $fgetc(l_handle) - 48; // ASCII '0'/'1' → integer
+            ch = $fscanf(l_handle, "%d", expected_labels[s]);
         $fclose(l_handle);
         $display("  %0d labels loaded", N_SAMPLES);
 
@@ -94,7 +94,8 @@ module tb_onyx_v4;
         end
         load_weights = 0;
         #10;
-        $display("  Weight[0]=%0d, Weight[16]=%0d", dut.weight_mem[0], dut.weight_mem[16]);
+        $display("  Weight[0]=%0d, Weight[16]=%0d, Weight[1]=%0d, Weight[17]=%0d",
+            dut.weight_mem[0], dut.weight_mem[16], dut.weight_mem[1], dut.weight_mem[17]);
 
         // ── Test all 50 samples ──
         $display("");

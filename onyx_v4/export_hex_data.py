@@ -102,22 +102,28 @@ clf.fit(fingerprints, y)
 W = clf.coef_
 
 # ── Write weights.hex ──
+# Scale weights by SCALE_FACTOR so float values become meaningful 16-bit integers
+# Ridge produces weights in [-1.5, 1.5]; multiply by 10000 preserves 4 decimal places
+SCALE_FACTOR = 10000
+
 # RidgeClassifier in binary mode returns coef_ of shape (n_features,)
-# We build 2x16: class 0 = +coef, class 1 = -coef (mirror)
+# Build 2x16: class 0 = +coef, class 1 = -coef (mirror)
 if W.ndim == 1:
     W_2d = np.stack([+W, -W], axis=0)  # (2, 16)
 else:
     W_2d = W  # already (n_classes, n_features)
 
+W_scaled = (W_2d * SCALE_FACTOR).astype(np.int64)
+
 with open('weights_hex.txt', 'w') as f:
     for c in range(2):
         for d in range(16):
-            val = int(W_2d[c, d])
+            val = int(W_scaled[c, d])
             if val < 0:
                 val = val & 0xFFFF
             f.write(f'{val:04X} ')
         f.write('\n')
-print('✓ weights_hex.txt (2×16)')
+print(f'✓ weights_hex.txt (2×16, scaled by {SCALE_FACTOR})')
 
 # ── Write expected_labels.txt ──
 with open('expected_labels.txt', 'w') as f:
