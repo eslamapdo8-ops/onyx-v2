@@ -40,7 +40,8 @@ class NCO:
         self.seed = 0xACE142BD
     def step(self, f_word):
         fb = self.seed & 1
-        self.seed = ((self.seed >> 1) | (fb << 31)) ^ (0xB4BCD35C if fb else 0)
+        self.seed = ((self.seed << 1) | fb) ^ (0xB4BCD35C if fb else 0)
+        self.seed = self.seed & 0xFFFFFFFF  # عودة إلى 32-bit
         b0 = (self.seed >> 24) & 0xFF
         b1 = (self.seed >> 8) & 0xFF
         b2 = (self.seed << 8) & 0xFF0000
