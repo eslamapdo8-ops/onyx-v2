@@ -4,7 +4,7 @@
  * خزان مذبذبات NCO + ضوضاء LFSR + تصويت FDE
  *
  * N_OSC = 6 مذبذبات
- * N_WINDOW = 2 دورات ساعة للتصنيف
+ * N_WINDOW = 3 دورات ساعة للتصنيف
  * N_SAMPLES = 50 تصنيف
  *
  * التحكم:
@@ -17,7 +17,7 @@ module onyx_core #(
     parameter ACC_WIDTH = 32,
     parameter THRESHOLD = 32'h40000000,
     parameter OFFSET    = 32'h20000000,
-    parameter N_WINDOW  = 2
+    parameter N_WINDOW  = 3
 )(
     input  wire                 clk,
     input  wire                 rst_n,
@@ -63,7 +63,7 @@ module onyx_core #(
             ) osc (
                 .clk(clk),
                 .rst_n(rst_n),
-                .enable((state == RUN)),
+                .enable((state == RUN) || (state == IDLE && start)),
                 .f_word(signal_value),
                 .fire_pos(osc_fire_pos[i]),
                 .fire_neg(osc_fire_neg[i]),
@@ -104,11 +104,15 @@ module onyx_core #(
                     if (start) begin
                         state <= RUN;
                         step_counter <= 0;
+                        // في أول دورة، شغّل NCO فوراً بإبقاء enable=1
+                    end else begin
+                        step_counter <= 0;
                     end
                     debug_state <= 32'h0000_0001;
                 end
 
                 RUN: begin
+                    // NCO enable = 1 — أول دورة تراكم فعلية
                     step_counter <= step_counter + 1;
                     debug_state <= {24'h0000_01, step_counter};
 

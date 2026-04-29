@@ -12,7 +12,7 @@ module tb_onyx_core_v2;
     wire [15:0] total_fires;
     wire [31:0] debug_state;
 
-    onyx_core #(.N_OSC(6), .N_WINDOW(5)) dut (
+    onyx_core #(.N_OSC(6), .N_WINDOW(3)) dut (
         .clk(clk), .rst_n(rst_n), .start(start),
         .signal_value(signal_value),
         .done(done), .decision(decision),

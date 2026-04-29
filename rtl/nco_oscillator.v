@@ -28,7 +28,7 @@ module nco_oscillator #(
     wire feedback = lfsr_state[0];
     wire [ACC_WIDTH-1:0] next_lfsr = {lfsr_state[ACC_WIDTH-2:0], 1'b0};
     wire signed [ACC_WIDTH-1:0] noise =
-        {lfsr_state[7:0], lfsr_state[15:8], lfsr_state[23:16], lfsr_state[31:24]} / 2;
+                {lfsr_state[7:0], lfsr_state[15:8], lfsr_state[23:16], lfsr_state[31:24]} / 16;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
