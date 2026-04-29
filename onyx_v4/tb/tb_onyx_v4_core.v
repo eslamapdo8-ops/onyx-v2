@@ -97,6 +97,10 @@ module tb_onyx_v4;
         $display("  Weight[0]=%0d, Weight[16]=%0d, Weight[1]=%0d, Weight[17]=%0d",
             dut.weight_mem[0], dut.weight_mem[16], dut.weight_mem[1], dut.weight_mem[17]);
 
+        // ── Debug: monitor first sample's firing_dir ──
+        $display("");
+        $display("── Debug: Sample 0 feature loading ──");
+
         // ── Test all 50 samples ──
         $display("");
         $display("── Testing %0d MNIST samples ──", N_SAMPLES);

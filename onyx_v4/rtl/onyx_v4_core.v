@@ -65,6 +65,16 @@ module onyx_v4_core #(
     wire [N_OSC*ACC_WIDTH-1:0]   osc_fire_counts;
     wire                         reset_counts = (state == RUN && step_counter == 0);
 
+    // Debug: print firing_dir on first sample
+    always @(posedge clk) begin
+        if (state == DONE_ST && step_counter == N_WINDOW - 1) begin
+            $write("  FIRING_DIR: ");
+            for (integer dd = 0; dd < N_OSC; dd = dd + 1)
+                $write("%d", osc_firing_dir[dd]);
+            $display("");
+        end
+    end
+
     genvar i;
     generate
         for (i = 0; i < N_OSC; i = i + 1) begin : osc_bank
