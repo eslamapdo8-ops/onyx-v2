@@ -14,6 +14,7 @@ module nco_oscillator #(
     input  wire                 clk,
     input  wire                 rst_n,
     input  wire                 enable,
+    input  wire                 reset_counts,   // إعادة تعيين الإطلاقات (لـ V4)
     input  wire signed [ACC_WIDTH-1:0] f_word,
     output reg                  fire_pos,
     output reg                  fire_neg,
@@ -38,6 +39,9 @@ module nco_oscillator #(
             fire_count <= 0;
             firing_dir <= 0;
             lfsr_state <= LFSR_SEED;
+        end else if (reset_counts) begin
+            // إعادة تعيين fire_count فقط (يُحافظ على acc, lfsr, phase)
+            fire_count <= 0;
         end else if (enable) begin
             // LFSR step
             if (feedback)

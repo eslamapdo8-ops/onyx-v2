@@ -32,7 +32,7 @@ module onyx_v4_core #(
     input  wire                         clk,
     input  wire                         rst_n,
     input  wire                         start,           // بدء تصنيف
-    input  wire signed [ACC_WIDTH-1:0]  features  [0:N_OSC-1],  // N درجات إدخال
+    input  wire signed [ACC_WIDTH*N_OSC-1:0] features_packed, // N ميزة (متسلسلة)
     input  wire                         load_weights,    // تحميل أوزان القراءة
     input  wire [7:0]                   weight_addr,     // عنوان الوزن
     input  wire signed [W_WEIGHT_W-1:0] weight_data,     // بيانات الوزن
@@ -40,6 +40,15 @@ module onyx_v4_core #(
     output reg  [7:0]                   class_id,        // الفئة المنتقاة (0..N_CLASSES-1)
     output reg  [15:0]                  total_fires      // إجمالي الإطلاقات
 );
+
+    // ========== Unpack features ==========
+    wire signed [ACC_WIDTH-1:0] features [0:N_OSC-1];
+    genvar fi;
+    generate
+        for (fi = 0; fi < N_OSC; fi = fi + 1) begin : feature_unpack
+            assign features[fi] = features_packed[fi*ACC_WIDTH +: ACC_WIDTH];
+        end
+    endgenerate
 
     // ========== FSM ==========
     localparam IDLE      = 3'b000;
@@ -52,8 +61,9 @@ module onyx_v4_core #(
     reg [7:0] step_counter;
 
     // ========== NCO Array ==========
-    wire [N_OSC-1:0]             osc_firing_dir;     // 1=موجب, 0=سالب
-    wire [N_OSC*ACC_WIDTH-1:0]   osc_fire_counts;    // متسلسلة
+    wire [N_OSC-1:0]             osc_firing_dir;
+    wire [N_OSC*ACC_WIDTH-1:0]   osc_fire_counts;
+    wire                         reset_counts = (state == RUN && step_counter == 0);
 
     genvar i;
     generate
@@ -70,7 +80,8 @@ module onyx_v4_core #(
             ) osc (
                 .clk(clk),
                 .rst_n(rst_n),
-                .enable((state == RUN) || (state == IDLE && start)),
+                .enable((state == RUN)),
+                .reset_counts(reset_counts),
                 .f_word(features[i]),
                 .fire_pos(),      // غير مستخدم — نكتفي بـ firing_dir
                 .fire_neg(),
@@ -118,7 +129,8 @@ module onyx_v4_core #(
                 end
 
                 READOUT: begin
-                    // حساب scores[c] = sum_d(weight_mem[c*N + d] × firing_dir[d])
+                    // حساب scores[c] = sum_d(weight_mem[c*N + d] × fingerprint[d])
+                    // fingerprint[d] = +1 (firing_dir=1) أو -1 (firing_dir=0)
                     for (c = 0; c < N_CLASSES; c = c + 1) begin
                         scores[c] = 0;
                         for (d = 0; d < N_OSC; d = d + 1) begin
@@ -163,11 +175,12 @@ module onyx_v4_core #(
     end
 
     // ========== Total Fires ==========
+    integer f;
     always @(*) begin
         total_fires = 0;
-        for (i = 0; i < N_OSC; i = i + 1) begin
+        for (f = 0; f < N_OSC; f = f + 1) begin
             total_fires = total_fires +
-                osc_fire_counts[i*ACC_WIDTH +: ACC_WIDTH];
+                osc_fire_counts[f*ACC_WIDTH +: ACC_WIDTH];
         end
     end
 
