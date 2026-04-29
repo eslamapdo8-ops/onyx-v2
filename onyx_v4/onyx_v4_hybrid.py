@@ -76,12 +76,12 @@ def im2col(img, ksize=3, stride=1, pad=1):
 
 def conv2d_forward(x, W, b):
     """x: (N, C, H, W), W: (F, C, 3, 3), b: (F,) → (N, F, H', W')."""
-    N, C, H, W = x.shape
+    N, C, H, Wx = x.shape
     F, _, ksize, _ = W.shape
     stride = 1
     pad = 1
     H_out = (H + 2*pad - ksize) // stride + 1
-    W_out = (W + 2*pad - ksize) // stride + 1
+    W_out = (Wx + 2*pad - ksize) // stride + 1
 
     out = np.zeros((N, F, H_out, W_out))
     for n in range(N):
