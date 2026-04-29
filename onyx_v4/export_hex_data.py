@@ -19,9 +19,7 @@ def load_mnist_png_arrays(class_ids, n_per, split='testing', base='/workspaces/o
             y.append(cid)
     X = np.array(X)
     y = np.array(y)
-    # Shuffle
-    idx = np.random.RandomState(42).permutation(len(y))
-    return X[idx], y[idx]
+    return X, y
 
 def to_fixed(x):
     """Convert float ∈ [-1,1] to signed 32-bit hex (Q1.30 format)."""
@@ -60,8 +58,10 @@ class NCO:
 
 # ── Load MNIST from PNG (25 zeros + 25 ones) ──
 print('Loading MNIST from PNG...')
+# Use fixed seed for reproducible load
+np.random.seed(42)
 X, y = load_mnist_png_arrays([0, 1], 100, 'training')
-# Take exactly 25 per class (50 total)
+# Take exactly 25 per class in order (reproducible)
 mask0 = np.where(y == 0)[0][:25]
 mask1 = np.where(y == 1)[0][:25]
 idx = np.concatenate([mask0, mask1])
