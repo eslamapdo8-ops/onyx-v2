@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
 """Export MNIST 0/1 data as Verilog .hex files for V4 RTL testbench.
-Works without TensorFlow — reads MNIST from gzip files directly."""
+Reads MNIST from PNG directory (same format as onyx_v4_proto.py)."""
 import numpy as np
-import gzip
-import os
+import os, glob
+from PIL import Image
+from sklearn.linear_model import RidgeClassifier
 
-MNIST_DIR = os.path.join(os.path.dirname(__file__), '..', 'HD_NCO_ARRAY', 'mnist_data')
-
-def read_mnist_images(filename):
-    """Read MNIST images from IDX3 format."""
-    with gzip.open(filename, 'rb') as f:
-        f.read(16)  # magic + dims
-        data = np.frombuffer(f.read(), dtype=np.uint8)
-    return data.reshape(-1, 784).astype(np.float64)
-
-def read_mnist_labels(filename):
-    """Read MNIST labels from IDX1 format."""
-    with gzip.open(filename, 'rb') as f:
-        f.read(8)  # magic + count
-        return np.frombuffer(f.read(), dtype=np.uint8)
+def load_mnist_png_arrays(class_ids, n_per, split='testing', base='/workspaces/onyx-v2/mnist_png'):
+    """Load MNIST as numpy arrays from PNG directories."""
+    X, y = [], []
+    for cid in class_ids:
+        path = os.path.join(base, split, str(cid), '*.png')
+        files = sorted(glob.glob(path))
+        for f in files[:n_per]:
+            img = Image.open(f).convert('L')  # grayscale
+            arr = np.array(img, dtype=np.float64).flatten()
+            X.append(arr)
+            y.append(cid)
+    X = np.array(X)
+    y = np.array(y)
+    # Shuffle
+    idx = np.random.RandomState(42).permutation(len(y))
+    return X[idx], y[idx]
 
 def to_fixed(x):
     """Convert float ∈ [-1,1] to signed 32-bit hex (Q1.30 format)."""
@@ -55,29 +58,15 @@ class NCO:
             self.firing_dir = 0
             self.acc += self.off
 
-# ── Load MNIST from gzip ──
-print(f'Looking for MNIST in: {MNIST_DIR}')
-if not os.path.isdir(MNIST_DIR):
-    # Try fallback paths
-    for p in ['/workspaces/onyx-v2/HD_NCO_ARRAY/mnist_data',
-              os.path.join(os.path.dirname(__file__), 'mnist_data')]:
-        if os.path.isdir(p):
-            MNIST_DIR = p
-            break
-    else:
-        print('ERROR: mnist_data directory not found!')
-        print('Looked in:')
-        print(f'  {os.path.join(os.path.dirname(__file__), "..", "HD_NCO_ARRAY", "mnist_data")}')
-        import sys; sys.exit(1)
-
-print(f'Using MNIST from: {MNIST_DIR}')
-
-xt = read_mnist_images(os.path.join(MNIST_DIR, 'train-images-idx3-ubyte.gz'))
-yt = read_mnist_labels(os.path.join(MNIST_DIR, 'train-labels-idx1-ubyte.gz'))
-
-mask = (yt == 0) | (yt == 1)
-X = xt[mask][:50]
-y = yt[mask][:50]
+# ── Load MNIST from PNG (25 zeros + 25 ones) ──
+print('Loading MNIST from PNG...')
+X, y = load_mnist_png_arrays([0, 1], 100, 'training')
+# Take exactly 25 per class (50 total)
+mask0 = np.where(y == 0)[0][:25]
+mask1 = np.where(y == 1)[0][:25]
+idx = np.concatenate([mask0, mask1])
+X = X[idx]
+y = y[idx]
 print(f'Total: {len(X)}, class 0: {sum(y==0)}, class 1: {sum(y==1)}')
 
 # ── Random Projection 784→16 ──
@@ -108,7 +97,6 @@ for s in range(len(features)):
         fingerprints[s, d] = 1 if ncos[d].firing_dir else -1
 
 # ── Train Linear Readout ──
-from sklearn.linear_model import RidgeClassifier
 clf = RidgeClassifier(alpha=1.0)
 clf.fit(fingerprints, y)
 W = clf.coef_
@@ -137,7 +125,8 @@ c0_correct = np.sum((preds == y) & (y == 0))
 c1_correct = np.sum((preds == y) & (y == 1))
 c0_total = np.sum(y == 0)
 c1_total = np.sum(y == 1)
-print(f'\n── Training Results ──')
-print(f'Overall: {correct}/{len(y)} = {correct/len(y)*100:.1f}%')
-print(f'Class 0: {c0_correct}/{c0_total} = {c0_correct/c0_total*100:.1f}%')
-print(f'Class 1: {c1_correct}/{c1_total} = {c1_correct/c1_total*100:.1f}%')
+print(f'\n── Linear Readout Results (Python reference) ──')
+print(f'Overall:     {correct}/{len(y)} = {correct/len(y)*100:.1f}%')
+print(f'Class 0:     {c0_correct}/{c0_total} = {c0_correct/c0_total*100:.1f}%')
+print(f'Class 1:     {c1_correct}/{c1_total} = {c1_correct/c1_total*100:.1f}%')
+print(f'\nExpected in Verilog: ~{correct/len(y)*100:.1f}%')
