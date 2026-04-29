@@ -1,0 +1,125 @@
+name: Onyx V4 — FPGA Synthesis (iCE40)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'onyx_v4/rtl/**'
+      - 'rtl/nco_oscillator.v'
+  workflow_dispatch:
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install OSS CAD Suite
+        run: |
+          wget -q https://github.com/YosysHQ/oss-cad-suite-build/releases/latest/download/oss-cad-suite-linux-x64.tgz
+          tar -xzf oss-cad-suite-linux-x64.tgz
+          echo "$PWD/oss-cad-suite/bin" >> $GITHUB_PATH
+
+      - name: Synthesize — N=16, binary
+        run: |
+          source <(tr ':' '\n' <<< "$PATH" | head -1)/../env
+          mkdir -p build
+          cd build
+          cat > onyx_v4_top.v << 'EOF'
+          module onyx_v4_top (
+              input  wire clk_12mhz,
+              input  wire rst_n,
+              input  wire uart_rx,
+              output wire uart_tx,
+              output wire [7:0] led
+          );
+              localparam N_OSC = 16;
+              localparam N_CLASSES = 2;
+              localparam N_WINDOW = 20;
+
+              reg start;
+              reg load_weights;
+              reg [7:0] weight_addr;
+              reg signed [15:0] weight_data;
+              reg signed [511:0] features_packed;
+              wire done;
+              wire [7:0] class_id;
+              wire [15:0] total_fires;
+
+              onyx_v4_core #(
+                  .N_OSC(N_OSC),
+                  .N_CLASSES(N_CLASSES),
+                  .N_WINDOW(N_WINDOW)
+              ) core_inst (
+                  .clk(clk_12mhz),
+                  .rst_n(rst_n),
+                  .start(start),
+                  .features_packed(features_packed),
+                  .load_weights(load_weights),
+                  .weight_addr(weight_addr),
+                  .weight_data(weight_data),
+                  .done(done),
+                  .class_id(class_id),
+                  .total_fires(total_fires)
+              );
+
+              reg done_q;
+              always @(posedge clk_12mhz) done_q <= done;
+              assign uart_tx = done_q;
+              assign led = class_id;
+          endmodule
+          EOF
+
+          cp ../rtl/nco_oscillator.v .
+          cp ../onyx_v4/rtl/onyx_v4_core.v .
+
+          echo "=== Yosys Synthesis ==="
+          yosys -p "
+            read -sv nco_oscillator.v
+            read -sv onyx_v4_core.v
+            read -sv onyx_v4_top.v
+            synth_ice40 -top onyx_v4_top -json onyx_v4.json
+          " 2>&1 | tee yosys_report.txt
+
+      - name: Extract resource stats
+        run: |
+          cd build
+          python3 -c "
+          import re
+          with open('yosys_report.txt') as f:
+              text = f.read()
+          
+          lc = re.search(r'(\d+)\s+LCs', text)
+          dff = re.search(r'(\d+)\s+DFF', text)
+          bram = re.search(r'BRAM.*?(\d+)', text)
+
+          lc_val = lc.group(1) if lc else 'N/A'
+          dff_val = dff.group(1) if dff else 'N/A'
+          bram_val = bram.group(1) if bram else '0'
+
+          print('Resource Usage (iCE40 UP5K):')
+          print(f'  LCs: {lc_val} / 5280')
+          if lc:
+              print(f'  Util: {int(lc_val)/5280*100:.1f}%')
+          print(f'  DFFs: {dff_val}')
+          print(f'  BRAM: {bram_val} / 30')
+          print(f'  Target: N=16, N_CLASSES=2, N_WINDOW=20')
+
+          with open('resource_summary.md', 'w') as f:
+              f.write('# Onyx V4 — FPGA Resource Summary\\n\\n')
+              f.write(f'- LCs: {lc_val}\\n')
+              f.write(f'- DFFs: {dff_val}\\n')
+              f.write(f'- BRAM: {bram_val}\\n')
+              f.write(f'- Target FPGA: iCE40 UP5K (5,280 LCs)\\n')
+              f.write(f'- Configuration: N=16, N_CLASSES=2, N_WINDOW=20\\n')
+          "
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: onyx-v4-synth
+          path: build/
+
+      - name: Show summary
+        run: cat build/resource_summary.md
