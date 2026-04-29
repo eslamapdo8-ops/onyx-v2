@@ -105,32 +105,35 @@ def flatten(x):
 
 def build_cnn():
     """Build CNN weights and return forward function."""
+    class CNNWeights:
+        pass
+    cnn = CNNWeights()
     # Conv1: 1 → 8 filters, 3x3
-    W1 = np.random.randn(8, 1, 3, 3) * np.sqrt(2.0 / (1 * 9))
-    b1 = np.zeros(8)
+    cnn.W1 = np.random.randn(8, 1, 3, 3) * np.sqrt(2.0 / (1 * 9))
+    cnn.b1 = np.zeros(8)
     # Conv2: 8 → 16 filters, 3x3
-    W2 = np.random.randn(16, 8, 3, 3) * np.sqrt(2.0 / (8 * 9))
-    b2 = np.zeros(16)
+    cnn.W2 = np.random.randn(16, 8, 3, 3) * np.sqrt(2.0 / (8 * 9))
+    cnn.b2 = np.zeros(16)
     # FC: 784 (7*7*16) → 128
-    W3 = np.random.randn(128, 784) * np.sqrt(2.0 / 784)
-    b3 = np.zeros(128)
+    cnn.W3 = np.random.randn(128, 784) * np.sqrt(2.0 / 784)
+    cnn.b3 = np.zeros(128)
 
-    def forward(images_np, _W1=W1, _b1=b1, _W2=W2, _b2=b2, _W3=W3, _b3=b3):
+    def forward(images_np):
         """images_np: (N, 28, 28) → features: (N, 128)."""
         x = images_np[:, None, :, :].astype(np.float32)  # (N, 1, 28, 28)
         x = x / 127.5 - 1.0  # normalize to [-1, 1]
 
         # Conv1 + ReLU + Pool
-        x = conv2d_forward(x, _W1, _b1)  # (N, 8, 28, 28)
+        x = conv2d_forward(x, cnn.W1, cnn.b1)  # (N, 8, 28, 28)
         x = maxpool2x2(x)              # (N, 8, 14, 14)
 
         # Conv2 + ReLU + Pool
-        x = conv2d_forward(x, _W2, _b2)  # (N, 16, 14, 14)
+        x = conv2d_forward(x, cnn.W2, cnn.b2)  # (N, 16, 14, 14)
         x = maxpool2x2(x)              # (N, 16, 7, 7)
 
         # Flatten + FC
         x = flatten(x)                 # (N, 784)
-        x = x @ _W3.T + _b3            # (N, 128) — no activation
+        x = x @ cnn.W3.T + cnn.b3      # (N, 128) — no activation
         return x
 
     return forward
